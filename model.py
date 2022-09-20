@@ -8,12 +8,13 @@ import torch
 from torch import nn
 from transformers import BertConfig, BertModel
 
+model_name = 'mengzi-bert-L6-H768'
 
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.config = BertConfig.from_pretrained('./mengzi_pretrain/mengzi-bert-L6-H768/config.json')
-        self.bert = BertModel.from_pretrained('./mengzi_pretrain/mengzi-bert-L6-H768/pytorch_model.bin', config=self.config)
+        self.config = BertConfig.from_pretrained('./mengzi_pretrain/{}/config.json'.format(model_name))
+        self.bert = BertModel.from_pretrained('./mengzi_pretrain/{}/pytorch_model.bin'.format(model_name), config=self.config)
 
     def forward(self, input_ids, attention_mask, encoder_type='fist-last-avg'):
         '''
@@ -24,7 +25,7 @@ class Model(nn.Module):
         '''
         output = self.bert(input_ids, attention_mask, output_hidden_states=True)
 
-        if encoder_type == 'fist-last-avg':
+        if encoder_type == 'first-last-avg':
             # 第一层和最后一层的隐层取出  然后经过平均池化
             first = output.hidden_states[1]   # hidden_states列表有13个hidden_state，第一个其实是embeddings，第二个元素才是第一层的hidden_state
             last = output.hidden_states[-1]

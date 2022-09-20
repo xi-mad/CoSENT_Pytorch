@@ -20,6 +20,10 @@ from data_helper import CustomDataset, collate_fn, pad_to_maxlen, load_data, loa
 import time
 import pathlib
 
+mul = 20
+model_encoder_type = 'first-last-avg'
+
+
 def get_time():
     t = time.localtime()
     return '_'.join([str(i) for i in [t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec]])
@@ -60,7 +64,7 @@ def evaluate():
             lab = lab.cuda()
 
         with torch.no_grad():
-            output = model(input_ids=input_ids, attention_mask=input_mask, encoder_type='fist-last-avg')
+            output = model(input_ids=input_ids, attention_mask=input_mask, encoder_type=model_encoder_type)
 
         all_a_vecs.append(output[0].cpu().numpy())
         all_b_vecs.append(output[1].cpu().numpy())
@@ -87,7 +91,7 @@ def calc_loss(y_true, y_pred):
     y_pred = y_pred / norms
 
     # 3. 奇偶向量相乘
-    y_pred = torch.sum(y_pred[::2] * y_pred[1::2], dim=1) * 20
+    y_pred = torch.sum(y_pred[::2] * y_pred[1::2], dim=1) * mul
     
 
     # 4. 取出负例-正例的差值
@@ -150,6 +154,10 @@ if __name__ == '__main__':
     pre_corr = -1
     now_time = get_time()
     pathlib.Path(os.path.join(args.output_dir, dataset + '_' + now_time)).mkdir(parents=True, exist_ok=True)
+    logs_path = os.path.join(args.output_dir, dataset + '_' + now_time, 'logs.txt')
+    with open(logs_path, 'a+') as f:
+        f.write(str(mul) + '\n')
+        f.write(str(model_encoder_type) + '\n')
     for epoch in range(args.num_train_epochs):
         model.train()
         train_label, train_predict = [], []
@@ -161,7 +169,7 @@ if __name__ == '__main__':
             if torch.cuda.is_available():
                 input_ids, input_mask, segment_ids = input_ids.cuda(), input_mask.cuda(), segment_ids.cuda()
                 label_ids = label_ids.cuda()
-            output = model(input_ids=input_ids, attention_mask=input_mask, encoder_type='fist-last-avg')
+            output = model(input_ids=input_ids, attention_mask=input_mask, encoder_type=model_encoder_type)
             loss = calc_loss(label_ids, output)
             loss.backward()
             # print("当前轮次:{}, 正在迭代:{}/{}, Loss:{:10f}".format(epoch, step, len(train_dataloader), loss))  # 在进度条前面定义一段文字
@@ -185,5 +193,8 @@ if __name__ == '__main__':
         if corr > pre_corr:
             pre_corr = corr
             model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
-            output_model_file = os.path.join(args.output_dir, dataset + '_' + now_time, "base_model_epoch_{}_corr_{}.bin".format(epoch, corr))
-            torch.save(model_to_save.state_dict(), output_model_file)
+            # output_model_file = os.path.join(args.output_dir, dataset + '_' + now_time, "base_model_epoch_{}_corr_{}.bin".format(epoch, corr))
+            # torch.save(model_to_save.state_dict(), output_model_file)
+            output_model_file = os.path.join(args.output_dir, dataset + '_' + now_time, "base_model_epoch_{}_corr_{}.txt".format(epoch, corr))
+            with open(output_model_file, 'w') as f:
+                f.write("1")
